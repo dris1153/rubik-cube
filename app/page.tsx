@@ -1,6 +1,6 @@
 "use client";
 
-import { Scene } from "@/components/rubik-s-cube";
+import { Scene } from "@/components/scene";
 
 export default function Home() {
   return <Scene />;

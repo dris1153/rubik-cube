@@ -12,6 +12,7 @@ function SceneContent() {
   const depthBuffer = useDepthBuffer({
     size: 2048,
     frames: 1,
+
     // disableRenderLoop: true,
   });
 
@@ -25,26 +26,40 @@ function SceneContent() {
     <>
       {/* Basic light setup */}
       {/* <ambientLight intensity={0.5} /> */}
-      <directionalLight position={[-5, 5, 5]} intensity={1.2} castShadow />
+      <directionalLight position={[-5, 5, 5]} intensity={4} castShadow />
 
       <EnhancedSpotlight
         depthBuffer={depthBuffer}
-        color="#ff1e3c"
+        color="#ff212d"
         position={[3, 3, 2]}
         volumetric={true}
         opacity={1}
         penumbra={1}
-        distance={17}
+        distance={16}
         angle={0.8}
         attenuation={30}
         anglePower={6}
-        intensity={1}
+        intensity={2}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-bias={-0.0001}
         castShadow={true}
       />
-
+      <EnhancedSpotlight
+        depthBuffer={depthBuffer}
+        color="yellow"
+        position={[3, 3, 2]}
+        opacity={0.8}
+        penumbra={1}
+        distance={24}
+        angle={0.8}
+        attenuation={24}
+        anglePower={4}
+        intensity={1}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.0001}
+      />
       <PerspectiveCamera
         makeDefault
         fov={50}

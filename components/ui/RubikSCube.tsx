@@ -24,9 +24,15 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
   const mainGroupRef = useRef<THREE.Group>(null);
   const isAnimatingRef = useRef(false);
   const currentRotationRef = useRef(0);
-  const lastMoveAxisRef = useRef(null);
-  const currentMoveRef = useRef(null);
-  const animationFrameRef = useRef(null);
+  const lastMoveAxisRef = useRef<string | null>(null);
+  type Move = {
+    axis: "x" | "y" | "z";
+    layer: number;
+    direction: number;
+    rotationAngle: number;
+  };
+  const currentMoveRef = useRef<Move | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
   const viewportSizeRef = useRef({
     width: window.innerWidth,
@@ -69,26 +75,6 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     };
   });
 
-  const FACE_COLORS = {
-    top: "white",
-    bottom: "yellow",
-    front: "red",
-    back: "orange",
-    left: "green",
-    right: "blue",
-  };
-
-  const getFaceColorsForPosition = (x: number, y: number, z: number) => {
-    const faces: Partial<Record<string, string>> = {};
-    if (y === 1) faces.top = FACE_COLORS.top;
-    if (y === -1) faces.bottom = FACE_COLORS.bottom;
-    if (z === 1) faces.front = FACE_COLORS.front;
-    if (z === -1) faces.back = FACE_COLORS.back;
-    if (x === -1) faces.left = FACE_COLORS.left;
-    if (x === 1) faces.right = FACE_COLORS.right;
-    return faces;
-  };
-
   const initializeCubes = useCallback(() => {
     const initial = [];
     const positions = [-1, 0, 1];
@@ -101,7 +87,6 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
             rotationMatrix: new Matrix4().identity(),
             id: `cube-${x}-${y}-${z}`,
             originalCoords: { x, y, z },
-            faceColors: getFaceColorsForPosition(x, y, z),
           });
         }
       }
@@ -274,8 +259,9 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
   }, [resetCube, handleViewportChange]);
 
   const possibleMoves = useMemo(() => {
-    const moves = [];
-    for (const axis of ["x", "y", "z"]) {
+    const moves: { axis: "x" | "y" | "z"; layer: number; direction: number }[] =
+      [];
+    for (const axis of ["x", "y", "z"] as const) {
       for (const layer of [-1, 0, 1]) {
         for (const direction of [1, -1]) {
           moves.push({ axis, layer, direction });
@@ -288,7 +274,7 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
   const isInLayer = useCallback(
     (
       position: { x: number; y: number; z: number },
-      axis: string,
+      axis: "x" | "y" | "z",
       layer: number
     ) => {
       const coord =
@@ -354,7 +340,11 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     };
   }, [isVisible, selectNextMove]);
 
-  const createRotationMatrix = useCallback(
+  interface CreateRotationMatrixFn {
+    (axis: "x" | "y" | "z", angle: number): Matrix4;
+  }
+
+  const createRotationMatrix: CreateRotationMatrixFn = useCallback(
     (axis, angle) => {
       reusableMatrix4.identity();
       reusableQuaternion.identity();
@@ -367,19 +357,28 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     [reusableMatrix4, reusableQuaternion, reusableVec3]
   );
 
-  const easeInOutQuad = useCallback((t) => {
+  const easeInOutQuad = useCallback((t: number) => {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }, []);
 
   const matrixToQuaternion = useCallback(
-    (matrix) => {
+    (matrix: Matrix4) => {
       reusableQuaternion.setFromRotationMatrix(matrix);
       return reusableQuaternion.clone();
     },
     [reusableQuaternion]
   );
 
-  const normalizePositions = useCallback((cubes) => {
+  interface NormalizeCube {
+    position: Vector3;
+    rotationMatrix: Matrix4;
+    id: string;
+    originalCoords: { x: number; y: number; z: number };
+  }
+
+  type NormalizePositionsFn = (cubes: NormalizeCube[]) => NormalizeCube[];
+
+  const normalizePositions: NormalizePositionsFn = useCallback((cubes) => {
     return cubes.map((cube) => {
       const x = Math.round(cube.position.x);
       const y = Math.round(cube.position.y);
@@ -399,7 +398,16 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     });
   }, []);
 
-  const checkCubeIntegrity = useCallback((cubes) => {
+  interface CheckCubeIntegrityCube {
+    position: Vector3;
+    rotationMatrix: Matrix4;
+    id: string;
+    originalCoords: { x: number; y: number; z: number };
+  }
+
+  type CheckCubeIntegrityFn = (cubes: CheckCubeIntegrityCube[]) => boolean;
+
+  const checkCubeIntegrity: CheckCubeIntegrityFn = useCallback((cubes) => {
     if (cubes.length !== 27) {
       console.warn("Incorrect number of cubes:", cubes.length);
       return false;
@@ -416,7 +424,27 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     return true;
   }, []);
 
-  const updateCubes = useCallback(
+  interface UpdateCubesMove {
+    axis: "x" | "y" | "z";
+    layer: number;
+    direction: number;
+    rotationAngle: number;
+  }
+
+  interface UpdateCubesCube {
+    position: Vector3;
+    rotationMatrix: Matrix4;
+    id: string;
+    originalCoords: { x: number; y: number; z: number };
+  }
+
+  type UpdateCubesFn = (
+    prevCubes: UpdateCubesCube[],
+    move: UpdateCubesMove,
+    stepRotationMatrix: Matrix4
+  ) => UpdateCubesCube[];
+
+  const updateCubes: UpdateCubesFn = useCallback(
     (prevCubes, move, stepRotationMatrix) => {
       return prevCubes.map((cube) => {
         if (isInLayer(cube.position, move.axis, move.layer)) {
@@ -512,26 +540,26 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
     }
   });
 
-  // const chromeMaterial = useMemo(
-  //   () => ({
-  //     color: "#FFEC86",
-  //     metalness: 0.5,
-  //     roughness: 0.5,
-  //     clearcoat: 0,
-  //     clearcoatRoughness: 0,
-  //     reflectivity: 0.5,
-  //     iridescence: 0,
-  //     iridescenceIOR: 0,
-  //     iridescenceThicknessRange: [100, 400],
-  //     envMapIntensity: 8,
-  //   }),
-  //   []
-  // );
+  const chromeMaterial = useMemo(
+    () => ({
+      color: "#FF212D",
+      metalness: 0.5,
+      roughness: 0.5,
+      clearcoat: 0,
+      clearcoatRoughness: 0,
+      reflectivity: 0.5,
+      iridescence: 0,
+      iridescenceIOR: 0,
+      iridescenceThicknessRange: [100, 400] as [number, number],
+      envMapIntensity: 8,
+    }),
+    []
+  );
 
-  // const sharedMaterial = useMemo(
-  //   () => <meshPhysicalMaterial {...chromeMaterial} />,
-  //   [chromeMaterial]
-  // );
+  const sharedMaterial = useMemo(
+    () => <meshPhysicalMaterial {...chromeMaterial} />,
+    [chromeMaterial]
+  );
 
   return (
     <group ref={mainGroupRef} {...props}>
@@ -552,54 +580,8 @@ const RubiksCubeModel = forwardRef<unknown, RubiksCubeProps>((props, ref) => {
             castShadow={deviceSettings.castShadow}
             receiveShadow={deviceSettings.receiveShadow}
           >
-            <meshPhysicalMaterial
-              color={"#111"} // dark base
-              metalness={0.3}
-              roughness={0.7}
-            />
+            {sharedMaterial}
           </RoundedBox>
-
-          {/* Face stickers (like labels) */}
-          {Object.entries(cube.faceColors).map(([face, color]) => {
-            const epsilon = 0.001;
-            const half = size / 2;
-            const offset = half + epsilon;
-
-            const facePosition = {
-              top: [0, offset, 0],
-              bottom: [0, -offset, 0],
-              front: [0, 0, offset],
-              back: [0, 0, -offset],
-              left: [-offset, 0, 0],
-              right: [offset, 0, 0],
-            }[face];
-
-            const faceRotation = {
-              top: [Math.PI / 2, 0, 0],
-              bottom: [-Math.PI / 2, 0, 0],
-              front: [0, 0, 0],
-              back: [0, Math.PI, 0],
-              left: [0, Math.PI / 2, 0],
-              right: [0, -Math.PI / 2, 0],
-            }[face];
-
-            return (
-              <mesh
-                key={face}
-                position={facePosition}
-                rotation={faceRotation}
-                renderOrder={1} // ensure it's on top
-              >
-                <planeGeometry args={[size * 0.95, size * 0.95]} />
-                <meshBasicMaterial
-                  color={color}
-                  side={THREE.DoubleSide}
-                  polygonOffset
-                  polygonOffsetFactor={-1}
-                />
-              </mesh>
-            );
-          })}
         </group>
       ))}
     </group>
