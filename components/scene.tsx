@@ -26,7 +26,7 @@ function SceneContent() {
     <>
       {/* Basic light setup */}
       {/* <ambientLight intensity={0.5} /> */}
-      <directionalLight position={[-5, 5, 5]} intensity={4} castShadow />
+      {/* <directionalLight position={[-5, 5, 5]} intensity={4} castShadow /> */}
 
       <EnhancedSpotlight
         depthBuffer={depthBuffer}
