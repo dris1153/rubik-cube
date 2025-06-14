@@ -1,3 +1,7 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&display=swap");
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -119,4 +123,15 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.title {
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
+  font-size: 4rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  background: linear-gradient(90deg, #ff212d, #ffec86);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
 }
